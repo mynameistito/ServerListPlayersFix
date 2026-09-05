@@ -18,6 +18,7 @@
  */
 
 #include <stdio.h>
+#include <string>
 #include "serverlistplayersfix.h"
 #include <iserver.h>
 #include <steam/steam_gameserver.h>
@@ -99,20 +100,35 @@ void ServerListPlayersFix::UpdatePlayers()
 {
 	auto gpGlobals = engine->GetServerGlobals();
 	g_pEntitySystem = GameEntitySystem();
+	auto steamGameServer = g_steamAPI.SteamGameServer();
 
-	if(!gpGlobals || !g_pEntitySystem)
+	if(!gpGlobals || !g_pEntitySystem || !steamGameServer)
 		return;
+
+	std::string steamIds = "[";
+	bool firstSteamId = true;
 
 	for (int i = 0; i < gpGlobals->maxClients; i++)
 	{
 		auto steamId = engine->GetClientSteamID(CPlayerSlot(i));
 		if (steamId)
 		{
+			if (!firstSteamId)
+				steamIds += ",";
+
+			steamIds += "\"";
+			steamIds += std::to_string(steamId->ConvertToUint64());
+			steamIds += "\"";
+			firstSteamId = false;
+
 			auto controller = (CBasePlayerController*)g_pEntitySystem->GetEntityInstance(CEntityIndex(i+1));
 			if(controller)
-				g_steamAPI.SteamGameServer()->BUpdateUserData(*steamId, controller->GetPlayerName(), gameclients->GetPlayerScore(CPlayerSlot(i)));
+				steamGameServer->BUpdateUserData(*steamId, controller->GetPlayerName(), gameclients->GetPlayerScore(CPlayerSlot(i)));
 		}
 	}
+
+	steamIds += "]";
+	steamGameServer->SetKeyValue("slpf_steamids_v1", steamIds.c_str());
 }
 
 void ServerListPlayersFix::Hook_GameFrame(bool simulating, bool bFirstTick, bool bLastTick)
@@ -171,7 +187,7 @@ const char *ServerListPlayersFix::GetLicense()
 
 const char *ServerListPlayersFix::GetVersion()
 {
-	return "1.0.8";
+	return "1.0.9";
 }
 
 const char *ServerListPlayersFix::GetDate()
